@@ -46,7 +46,7 @@ for (i in 1:3) {
 library(openxlsx)
 library(TwoSampleMR)
 library(data.table)
-library(easyMRpro)
+
 setwd("D:/GWAS/GWAS1/Mental Health")
 f<-fread("ADHD.meta")
 head(f)
@@ -85,15 +85,6 @@ outcome_to_exposure_data(
   clump_r2 = 0.001,
   pval = 5e-08,
   save_path = "D:/GWAS/GWAS1/Physical Health copy"
-)
-
-easyMR::vcfGWAS(
-  filepath="D:/GWAS/GWAS1/Physical Health",
-  trait_name="stroke",
-  mrbase_id="ebi-a-GCST006906",
-  type = "exposure",
-  data_type = "binary",
-  save_path ="D:/GWAS/GWAS1/Physical Health copy"
 )
 
 
@@ -1250,7 +1241,7 @@ chr,pos,A1,A2,beta,se,pval相对应的列名，没有请使用其他转化函数
     
     dat <- dat%>%
       dplyr::filter(pval.exposure < pval_threshold)%>%
-      easyMR:::clump_data_modified(.,clump_local = clump_local,
+      clump_data(.,clump_local = clump_local,
                                    save_path = save_path,
                                    clump_kb = clump_kb,
                                    clump_r2 = clump_r2,
