@@ -77,28 +77,7 @@ format_MR_data(
   save_path =  "D:/GWAS/GWAS1/Mental Health copy"
 )
 
-outcome_to_exposure_data(
-  outfilename = "D:/GWAS/GWAS1/Physical Health copy/CAD-Majid_full_outcome.rds",
-  out_dat = NULL,
-  exp_name = "CAD-Majid",
-  clump_kb = 10000,
-  clump_r2 = 0.001,
-  pval = 5e-08,
-  save_path = "D:/GWAS/GWAS1/Physical Health copy"
-)
-
-
-###转换芬兰数据####
-trans_finn_data(
-  filename="D:/GWAS/GWAS1/Mental Health/finngen_R10_F5_OPIOIDS.gz",
-  type = "exposure",
-  clump_kb = 10000,
-  clump_r2 = 0.001,
-  pval = 5e-08,
-  save_path = "D:/GWAS/GWAS1/Mental Health copy"
-)
-
-####################CM11转化###################
+####################CM11###################
 setwd("D:/GWAS/GWAS1")
 library(data.table)
 f<-fread("SA.80")
@@ -126,19 +105,19 @@ format_MR_data(
   clump_r2 = 0.001,
   pval_threshold = 5e-08,
   clump_local = FALSE,
-  save_path = "D:/桌面文件/20230927毛兄猴哥西安老哥/童年创伤"
+  save_path = "D:/"
 )
 
 exposure_to_outcome_data(
   exp_full_file = "D:/CM1_full_exposure.rds",
   exp_full_data = NULL,
   out_name ="CM1",
-  save_path = "D:/桌面文件/20230927毛兄猴哥西安老哥/童年创伤"
+  save_path = "D:"
 )
 
 
 ###############CM_SA##############
-setwd("D:/CM_AS孟德尔随机化分")
+setwd("D:/CM_AS")
 library(TwoSampleMR)
 f<-readRDS("AS_full_exposure.rds")
 dat<-subset(f,f$pval.exposure<1e-06)
@@ -199,8 +178,8 @@ writexl::write_xlsx(x = press,path = paste0("AS_to_MC","_PRESSO_MR.xlsx"))
 ldsc(
   exp_name="AS",
   out_name="CM",
-  expfilename = "D:/CM_AS孟德尔随机化分/AS_full_exposure.rds",
-  outfilename = "D:/CM_AS孟德尔随机化分/CM_full_outcome.rds",
+  expfilename = "D:/CM_AS/AS_full_exposure.rds",
+  outfilename = "D:/CM_AS孟/CM_full_outcome.rds",
   exp_dat = "AS_full_exposure.rds",
   out_dat = "CM_full_outcome.rds",
   exp_type ="con",
@@ -214,27 +193,98 @@ ldsc(
   r2 = 0.001,
   MR_reverse = 5e-06,
   save_logfiles = TRUE,
-  save_path ="D:/CM_AS孟德尔随机化分"
+  save_path ="D:/CM_AS"
 )
 
 ###placo####
-two_trait_placo(
-  exp_file = "D:/CM_AS/CM_full_exposure.rds",
-  exp_name = "CM",
-  out_file = "D:/CM_AS/AS_full_outcome.rds",
-  out_name = "AS",
-  MAF_threshold = 0.01,
-  pval_threshold = 0.05,
-  save_path = "D:/CM_AS"
-)
+https://github.com/RayDebashree/PLACO?tab=readme-ov-file
+
+require(devtools)#devtools
+source_url("https://github.com/RayDebashree/PLACO/blob/master/PLACO_v0.1.1.R?raw=TRUE")
+
+###------------- Code for formally testing pleiotropic association of two phenotypes with SNPs using GWAS summary statistics-----------------
+#
+message("============================================================")
+message("                  PLACO v0.1.1 is loaded")
+message("============================================================")
+message("If you use this software, please cite:")
+message("Ray et al.(2020) A powerful method for pleiotropic analysis")
+message("    under composite null hypothesis identifies novel shared")
+message("    loci between type 2 diabetes and prostate cancer.")
+message("    BioRxiv https://doi.org/10.1101/2020.04.11.037630")
+message("------------------------------------------------------------")
+message("")
+
+############################################
+#---------------- Function for normal product based tail probability calculation 
+# (Using modified Bessel function of the 2nd kind with order 0)
+.pdfx<-function(x) besselK(x=abs(x),nu=0)/pi
+.p.bessel<-function(z, varz, AbsTol=1e-13){
+  p1<-2*as.double(integrate(Vectorize(.pdfx), abs(z[1]*z[2]/sqrt(varz[1])),Inf, abs.tol=AbsTol)$value)
+  p2<-2*as.double(integrate(Vectorize(.pdfx), abs(z[1]*z[2]/sqrt(varz[2])),Inf, abs.tol=AbsTol)$value)
+  p0<-2*as.double(integrate(Vectorize(.pdfx), abs(z[1]*z[2]),Inf, abs.tol=AbsTol)$value)
+  pval.compnull<-p1+p2-p0
+  return(pval.compnull)
+}
+
+#---------------- Function for estimating the variances for PLACO
+var.placo<-function(Z.matrix, P.matrix, p.threshold=1e-4){
+  # Here Z.matrix is the pxk matrix of Z-scores where p is total no. of variants in the dataset, and k is the no. of traits 
+  # Similarly, P.matrix is the corresponding pxk matrix of p-values where p is total no. of variants in the dataset, and k is the no. of traits
+  # p.threshold determines which variants are deemed to have no association marginally (default: 1e-4)
+  # checks
+  k<-ncol(Z.matrix)
+  if(k!=2) stop("This method is meant for 2 traits only. Columns correspond to traits.")
+  ZP<-cbind(Z.matrix,P.matrix)
+  ZP<-na.omit(ZP)
+
+  rows.alt<-which(ZP[,3]<p.threshold & ZP[,4]<p.threshold)
+  if(length(rows.alt)>0){
+    ZP<-ZP[-rows.alt,]
+    if(nrow(ZP)==0) stop(paste("No 'null' variant left at p-value threshold",p.threshold))
+    if(nrow(ZP)<30) warning(paste("Too few 'null' variants at p-value threshold",p.threshold))
+  }
+  varz<-diag(var(ZP[,c(1,2)]))
+  return(varz)
+}
+
+#---------------- Function for estimating correlation matrix of the Z's
+cor.pearson<-function(Z.matrix, P.matrix, p.threshold=1e-4){
+  # Here Z.matrix is the pxk matrix of Z-scores where p is total no. of variants in the dataset, and k is the no. of traits 
+  # Similarly, P.matrix is the corresponding pxk matrix of p-values where p is total no. of variants in the dataset, and k is the no. of traits
+  # p.threshold determines which variants are deemed to have no association marginally (default: 1e-4)
+  # checks
+  k<-ncol(Z.matrix)
+  if(k!=2) stop("This method is meant for 2 traits only.")
+  # estimating correlation
+    row.exclude<-which( apply(P.matrix, MARGIN = 1, function(x) any(x < p.threshold)) == TRUE )
+    if(length(row.exclude)>0) Z.matrix<-Z.matrix[-row.exclude,]
+  R<-cor(Z.matrix)
+  return(R)
+}
+
+############################################
+placo<-function(Z, VarZ, AbsTol=.Machine$double.eps^0.8){
+        # Z: vector of Z-scores of size k=2 (i.e., collection of Z-scores of a particular SNP for k=2 traits)
+        # VarZ: vector of variances of Z-scores (covariance assumed 0; so need to be independent traits)
+        # AbsTol: absolute tolerance (accuracy paramater) for numerical integration.
+   # checks        
+   k<-length(Z)    
+   if(k!=2) stop("This method is meant for 2 traits only.")
+   if(length(VarZ)!=k) stop("Provide variance estimates for 2 traits as obtained using var.placo() function.")
+   
+   # test of pleiotropy: PLACO
+   pvalue.b=.p.bessel(z=Z, varz=VarZ, AbsTol=AbsTol)
+   return(list(T.placo=prod(Z), p.placo=pvalue.b))
+}
+
+
 library(data.table)
 f<-fread("CM_AS.txt")
 dat<-subset(f,f$p.placo<5e-06)
 writexl::write_xlsx(x = dat,path = paste0("MC_to_AS","PLACO.xlsx"))
 data<-select(f,c("SNP","chr.exposure","pos.exposure","p.placo","effect_allele.exposure"))
 write.table(data,"cm_as_placo.txt",sep = "\t",quote = F,row.names = F)
-
-
 
 ##########cm1#########
 setwd("D:/GWAS/GWAS1/Lifestyle Factors copy")
@@ -915,8 +965,8 @@ for(j in 12:17){
 
 
 
-#########数据合并#########
-setwd("D:/GWAS/GWAS2/Brain Structures copy/中介到暴露")
+#########cbind#########
+setwd("D:/GWAS/GWAS2/Brain Structures copy/)
 a1<-"data.txt"
 lo1 <-list.files(pattern = "directionality_test.xlsx$")
 for (i in 1:17) {
@@ -931,7 +981,7 @@ for (i in 1:17) {
   a<-readxl::read_excel(lo2[i])
   a2<-rbind(a2,a)
 }
-writexl::write_xlsx(x = a2,"MR_Brain Structures_汇总结果.xlsx")
+writexl::write_xlsx(x = a2,"MR_Brain Structures.xlsx")
 
 a3<-"data.txt"
 lo3 <-list.files(pattern = "pleio.xlsx$")
@@ -968,8 +1018,8 @@ writexl::write_xlsx(x = a6,"MR_Brain Structures_PRESSO_TEST.xlsx")
 
 #########中介分析#########
 library(openxlsx)
-a<-read.xlsx("D:/GWAS/GWAS1/Physical Health copy/暴露到中介/MR_Brain Structures_汇总结果.xlsx")
-b<-read.xlsx("D:/GWAS/GWAS1/Physical Health copy/中介到结局/MR_Physical Health_汇总结果.xlsx")
+a<-read.xlsx("D:/GWAS/GWAS1/Physical Health copy/MR_Brain Structures_.xlsx")
+b<-read.xlsx("D:/GWAS/GWAS1/Physical Health copy/MR_Physical Health.xlsx")
 
 a<-subset(a,method=="Inverse variance weighted"|
             method=="Wald ratio") 
@@ -1118,9 +1168,7 @@ format_MR_data <- function(dat=NULL,
                             pval_threshold,
                             clump_local,
                             save_path){
-  
-  message("******转化数据前请确保数据中至少含有rs编号的SNP,
-chr,pos,A1,A2,beta,se,pval相对应的列名，没有请使用其他转化函数******")
+
   
   if(!is.null(dat)){
     
@@ -1192,7 +1240,6 @@ chr,pos,A1,A2,beta,se,pval相对应的列名，没有请使用其他转化函数
     
     if(any(is.na(dat$eaf.exposure))){
       
-      message("******部分数据无eaf值，将其转化成0.5******")
       
       dat$eaf.exposure <- as.numeric(dat$eaf.exposure)
       
