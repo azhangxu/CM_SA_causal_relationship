@@ -613,7 +613,7 @@ for (i in 1:13) {
   a<-readxl::read_excel(lo2[i])
   a2<-rbind(a2,a)
 }
-writexl::write_xlsx(x = a2,"MR_Brain Structures_汇总结果.xlsx")
+writexl::write_xlsx(x = a2,"MR_Brain Structures.xlsx")
 
 a3<-"data.txt"
 lo3 <-list.files(pattern = "pleio.xlsx$")
@@ -1086,7 +1086,7 @@ dd<-indirect_and_prop(c,
                       1.223,
                       0.19)
 cc<-cbind(a$outcome,dd)
-writexl::write_xlsx(x = cc,"D:/GWAS/GWAS1/Physical Health copy/中介_Physical Health_汇总结果.xlsx")
+writexl::write_xlsx(x = cc,"D:/GWAS/GWAS1/Physical Health copy/m_Physical Health.xlsx")
 
 
 format_MR_data <- function(dat=NULL,
